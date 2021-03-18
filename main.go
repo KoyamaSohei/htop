@@ -34,6 +34,7 @@ func main() {
 
 	li := widgets.NewList()
 	li.Title = "PID"
+	li.Border = false
 	li.TextStyle = ui.NewStyle(ui.ColorYellow)
 	li.WrapText = true
 	li.SetRect(0, 0, 25, 40)
