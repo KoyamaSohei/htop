@@ -28,26 +28,26 @@ func getPids() ([]int, error) {
 
 func main() {
 	if err := ui.Init(); err != nil {
-		log.Fatalf("failed to initialize termui: %v", err)
+		log.Fatalf("failed to initiaplistze termui: %v", err)
 	}
 	defer ui.Close()
 
-	li := widgets.NewList()
-	li.Title = "PID"
-	li.Border = false
-	li.TextStyle = ui.NewStyle(ui.ColorYellow)
-	li.WrapText = true
-	li.SetRect(0, 0, 25, 40)
+	plist := widgets.NewList()
+	plist.Title = "PID"
+	plist.Border = false
+	plist.TextStyle = ui.NewStyle(ui.ColorYellow)
+	plist.WrapText = true
+	plist.SetRect(0, 0, 25, 40)
 
 	pids, err := getPids()
 	if err != nil {
 		log.Fatalf("failed to get pid: %v", err)
 	}
 	for _, p := range pids {
-		li.Rows = append(li.Rows, fmt.Sprintf("%d", p))
+		plist.Rows = append(plist.Rows, fmt.Sprintf("%d", p))
 	}
 
-	ui.Render(li)
+	ui.Render(plist)
 	uiEvents := ui.PollEvents()
 	for {
 		e := <-uiEvents
@@ -55,19 +55,19 @@ func main() {
 		case "q", "<C-c>":
 			return
 		case "j", "<Down>":
-			li.ScrollDown()
+			plist.ScrollDown()
 		case "k", "<Up>":
-			li.ScrollUp()
+			plist.ScrollUp()
 		case "<C-d>":
-			li.ScrollHalfPageDown()
+			plist.ScrollHalfPageDown()
 		case "<C-u>":
-			li.ScrollHalfPageUp()
+			plist.ScrollHalfPageUp()
 		case "<C-f>":
-			li.ScrollPageDown()
+			plist.ScrollPageDown()
 		case "<C-b>":
-			li.ScrollPageUp()
+			plist.ScrollPageUp()
 		}
-		ui.Render(li)
+		ui.Render(plist)
 	}
 
 }
