@@ -23,5 +23,11 @@ func getPids() ([]int, error) {
 }
 
 func main() {
-	fmt.Printf("hello, world\n")
+	pids, err := getPids()
+	if err != nil {
+		panic(err)
+	}
+	for _, p := range pids {
+		fmt.Println(p)
+	}
 }
