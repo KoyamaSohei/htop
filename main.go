@@ -115,87 +115,94 @@ func main() {
 	}
 
 	if err := ui.Init(); err != nil {
-		log.Fatalf("failed to initiaplistze termui: %v", err)
+		log.Fatalf("failed to initiapidze termui: %v", err)
 	}
 	defer ui.Close()
 
-	plist := widgets.NewList()
-	plist.Title = "PID"
-	plist.Border = false
-	plist.TextStyle = ui.NewStyle(ui.ColorYellow)
-	plist.WrapText = true
+	pid := widgets.NewList()
+	pid.Title = "PID"
+	pid.Border = false
+	pid.TextStyle = ui.NewStyle(ui.ColorYellow)
+	pid.WrapText = true
 
-	ulist := widgets.NewList()
-	ulist.Title = "USER"
-	ulist.Border = false
-	ulist.TextStyle = ui.NewStyle(ui.ColorYellow)
-	ulist.WrapText = true
+	user := widgets.NewList()
+	user.Title = "USER"
+	user.Border = false
+	user.TextStyle = ui.NewStyle(ui.ColorYellow)
+	user.WrapText = true
 
-	clist := widgets.NewList()
-	clist.Title = "Command"
-	clist.Border = false
-	clist.TextStyle = ui.NewStyle(ui.ColorYellow)
-	clist.WrapText = true
+	command := widgets.NewList()
+	command.Title = "Command"
+	command.Border = false
+	command.TextStyle = ui.NewStyle(ui.ColorYellow)
+	command.WrapText = true
 
 	grid := ui.NewGrid()
 	termWidth, termHeight := ui.TerminalDimensions()
 	grid.SetRect(0, 0, termWidth, termHeight)
 	grid.Set(
-		ui.NewCol(1.0/3, plist),
-		ui.NewCol(1.0/3, ulist),
-		ui.NewCol(1.0/3, clist),
+		ui.NewCol(1.0/3, pid),
+		ui.NewCol(1.0/3, user),
+		ui.NewCol(1.0/3, command),
 	)
 
-	pids, err := getPids()
-	if err != nil {
-		log.Fatalf("failed to get pid: %v", err)
-	}
-	for _, p := range pids {
-		plist.Rows = append(plist.Rows, fmt.Sprintf("%d", p))
-		u, err := getUser(p)
+	update := func() {
+		pids, err := getPids()
 		if err != nil {
-			log.Fatalf("failed to get user: %v", err)
+			log.Fatalf("failed to get pid: %v", err)
 		}
-		ulist.Rows = append(ulist.Rows, u)
-		c, err := getCommand(p)
-		if err != nil {
-			log.Fatalf("failed to get command: %v", err)
+		pid.Rows = make([]string, 0)
+		user.Rows = make([]string, 0)
+		command.Rows = make([]string, 0)
+		for _, p := range pids {
+			pid.Rows = append(pid.Rows, fmt.Sprintf("%d", p))
+			u, err := getUser(p)
+			if err != nil {
+				log.Fatalf("failed to get user: %v", err)
+			}
+			user.Rows = append(user.Rows, u)
+			c, err := getCommand(p)
+			if err != nil {
+				log.Fatalf("failed to get command: %v", err)
+			}
+			command.Rows = append(command.Rows, trim(c))
 		}
-		clist.Rows = append(clist.Rows, trim(c))
+		ui.Render(grid)
 	}
 
-	ui.Render(grid)
+	update()
 
 	uiEvents := ui.PollEvents()
+
 	for {
 		e := <-uiEvents
 		switch e.ID {
 		case "q", "<C-c>":
 			return
 		case "j", "<Down>":
-			plist.ScrollDown()
-			ulist.ScrollDown()
-			clist.ScrollDown()
+			pid.ScrollDown()
+			user.ScrollDown()
+			command.ScrollDown()
 		case "k", "<Up>":
-			plist.ScrollUp()
-			ulist.ScrollUp()
-			clist.ScrollUp()
+			pid.ScrollUp()
+			user.ScrollUp()
+			command.ScrollUp()
 		case "<C-d>":
-			plist.ScrollHalfPageDown()
-			ulist.ScrollHalfPageDown()
-			clist.ScrollHalfPageDown()
+			pid.ScrollHalfPageDown()
+			user.ScrollHalfPageDown()
+			command.ScrollHalfPageDown()
 		case "<C-u>":
-			plist.ScrollHalfPageUp()
-			ulist.ScrollHalfPageUp()
-			clist.ScrollHalfPageUp()
+			pid.ScrollHalfPageUp()
+			user.ScrollHalfPageUp()
+			command.ScrollHalfPageUp()
 		case "<C-f>":
-			plist.ScrollPageDown()
-			ulist.ScrollPageDown()
-			clist.ScrollPageDown()
+			pid.ScrollPageDown()
+			user.ScrollPageDown()
+			command.ScrollPageDown()
 		case "<C-b>":
-			plist.ScrollPageUp()
-			ulist.ScrollPageUp()
-			clist.ScrollPageUp()
+			pid.ScrollPageUp()
+			user.ScrollPageUp()
+			command.ScrollPageUp()
 		}
 		ui.Render(grid)
 	}
