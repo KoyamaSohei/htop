@@ -82,21 +82,27 @@ func main() {
 	plist.Border = false
 	plist.TextStyle = ui.NewStyle(ui.ColorYellow)
 	plist.WrapText = true
-	plist.SetRect(0, 0, 8, 40)
 
 	ulist := widgets.NewList()
 	ulist.Title = "USER"
 	ulist.Border = false
 	ulist.TextStyle = ui.NewStyle(ui.ColorYellow)
 	ulist.WrapText = true
-	ulist.SetRect(8, 0, 24, 40)
 
 	clist := widgets.NewList()
 	clist.Title = "Command"
 	clist.Border = false
 	clist.TextStyle = ui.NewStyle(ui.ColorYellow)
 	clist.WrapText = true
-	clist.SetRect(24, 0, 56, 40)
+
+	grid := ui.NewGrid()
+	termWidth, termHeight := ui.TerminalDimensions()
+	grid.SetRect(0, 0, termWidth, termHeight)
+	grid.Set(
+		ui.NewCol(1.0/3, plist),
+		ui.NewCol(1.0/3, ulist),
+		ui.NewCol(1.0/3, clist),
+	)
 
 	pids, err := getPids()
 	if err != nil {
@@ -116,9 +122,7 @@ func main() {
 		clist.Rows = append(clist.Rows, trim(c))
 	}
 
-	ui.Render(plist)
-	ui.Render(ulist)
-	ui.Render(clist)
+	ui.Render(grid)
 
 	uiEvents := ui.PollEvents()
 	for {
@@ -151,9 +155,7 @@ func main() {
 			ulist.ScrollPageUp()
 			clist.ScrollPageUp()
 		}
-		ui.Render(plist)
-		ui.Render(ulist)
-		ui.Render(clist)
+		ui.Render(grid)
 	}
 
 }
