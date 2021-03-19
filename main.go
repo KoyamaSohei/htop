@@ -33,6 +33,43 @@ func getPids() ([]int, error) {
 	return pids, nil
 }
 
+type cpuStat struct {
+	usertime   uint64
+	nicetime   uint64
+	systemtime uint64
+	idletime   uint64
+	ioWait     uint64
+	irq        uint64
+	softIrq    uint64
+	steal      uint64
+	guest      uint64
+	guestnice  uint64
+}
+
+func getCpuStat(stat *cpuStat) error {
+	b, err := ioutil.ReadFile("/proc/stat")
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(b), "\n")
+	if len(lines) == 0 {
+		return fmt.Errorf("/proc/stat is empty")
+	}
+	_, err = fmt.Sscanf(lines[0],
+		"cpu  %d %d %d %d %d %d %d %d %d %d",
+		&stat.usertime,
+		&stat.nicetime,
+		&stat.systemtime,
+		&stat.idletime,
+		&stat.ioWait,
+		&stat.irq,
+		&stat.softIrq,
+		&stat.steal,
+		&stat.guest,
+		&stat.guestnice)
+	return err
+}
+
 func getCommand(pid int) (string, error) {
 	b, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
 	if err != nil {
