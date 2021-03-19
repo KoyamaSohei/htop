@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -72,6 +73,10 @@ func trim(str string) string {
 }
 
 func main() {
+	if runtime.GOOS != "linux" {
+		log.Fatalf("htop only support linux!\n")
+	}
+
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initiaplistze termui: %v", err)
 	}
