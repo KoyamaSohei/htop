@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -70,6 +72,10 @@ func getCpuStat(stat *cpuStat) error {
 	return err
 }
 
+func (stat cpuStat) getTotalTime() uint64 {
+	return stat.usertime + stat.nicetime + stat.systemtime + stat.idletime + stat.steal + stat.guest + stat.guestnice
+}
+
 func getCommand(pid int) (string, error) {
 	b, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
 	if err != nil {
@@ -93,6 +99,38 @@ func getUser(pid int) (string, error) {
 		return "", err
 	}
 	return u.Name, nil
+}
+
+type pstat struct {
+	utime   uint64
+	stime   uint64
+	started uint64
+}
+
+func getProcStat(pid int) (*pstat, error) {
+	b, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return nil, err
+	}
+	pos := bytes.LastIndexByte(b, ')')
+	if pos == -1 || len(b) < pos+2 {
+		return nil, fmt.Errorf("invalid format")
+	}
+	s := &pstat{}
+	ss := bytes.Split(b[pos+2:], []byte{' '})
+	if len(ss) < 20 {
+		return nil, fmt.Errorf("invalid format")
+	}
+	if s.utime, err = strconv.ParseUint(string(ss[11]), 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid format")
+	}
+	if s.stime, err = strconv.ParseUint(string(ss[12]), 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid format")
+	}
+	if s.started, err = strconv.ParseUint(string(ss[19]), 10, 64); err != nil {
+		return nil, fmt.Errorf("invalid format")
+	}
+	return s, nil
 }
 
 func trim(str string) string {
@@ -131,6 +169,12 @@ func main() {
 	user.TextStyle = ui.NewStyle(ui.ColorYellow)
 	user.WrapText = true
 
+	cpu := widgets.NewList()
+	cpu.Title = "CPU%"
+	cpu.Border = false
+	cpu.TextStyle = ui.NewStyle(ui.ColorYellow)
+	cpu.WrapText = true
+
 	command := widgets.NewList()
 	command.Title = "Command"
 	command.Border = false
@@ -141,18 +185,28 @@ func main() {
 	termWidth, termHeight := ui.TerminalDimensions()
 	grid.SetRect(0, 0, termWidth, termHeight)
 	grid.Set(
-		ui.NewCol(1.0/3, pid),
-		ui.NewCol(1.0/3, user),
-		ui.NewCol(1.0/3, command),
+		ui.NewCol(1.0/4, pid),
+		ui.NewCol(1.0/4, user),
+		ui.NewCol(1.0/4, cpu),
+		ui.NewCol(1.0/4, command),
 	)
+	stat := cpuStat{}
+	ps := map[int]pstat{}
 
 	update := func() {
 		pids, err := getPids()
 		if err != nil {
 			log.Fatalf("failed to get pid: %v", err)
 		}
+		var nstat cpuStat
+		if err := getCpuStat(&nstat); err != nil {
+			log.Fatalf("%v", err)
+		}
+		period := nstat.getTotalTime() - stat.getTotalTime()
+
 		pid.Rows = make([]string, 0)
 		user.Rows = make([]string, 0)
+		cpu.Rows = make([]string, 0)
 		command.Rows = make([]string, 0)
 		for _, p := range pids {
 			pid.Rows = append(pid.Rows, fmt.Sprintf("%d", p))
@@ -160,50 +214,75 @@ func main() {
 			if err != nil {
 				log.Fatalf("failed to get user: %v", err)
 			}
+
 			user.Rows = append(user.Rows, u)
 			c, err := getCommand(p)
 			if err != nil {
 				log.Fatalf("failed to get command: %v", err)
 			}
 			command.Rows = append(command.Rows, trim(c))
+
+			pstat, err := getProcStat(p)
+			if err != nil {
+				log.Fatalf("failed to get user: %v", err)
+			}
+			per := 0.0
+			if ppstat, ok := ps[p]; ok && period > 0 {
+				per = float64(pstat.stime+pstat.utime-ppstat.stime-ppstat.utime) / float64(period) * 100
+			}
+			ps[p] = *pstat
+			cpu.Rows = append(cpu.Rows, fmt.Sprintf("%f", per))
 		}
 		ui.Render(grid)
+		stat = nstat
 	}
+
+	uiEvents := ui.PollEvents()
+	ticker := time.NewTicker(time.Second).C
 
 	update()
 
-	uiEvents := ui.PollEvents()
-
 	for {
-		e := <-uiEvents
-		switch e.ID {
-		case "q", "<C-c>":
-			return
-		case "j", "<Down>":
-			pid.ScrollDown()
-			user.ScrollDown()
-			command.ScrollDown()
-		case "k", "<Up>":
-			pid.ScrollUp()
-			user.ScrollUp()
-			command.ScrollUp()
-		case "<C-d>":
-			pid.ScrollHalfPageDown()
-			user.ScrollHalfPageDown()
-			command.ScrollHalfPageDown()
-		case "<C-u>":
-			pid.ScrollHalfPageUp()
-			user.ScrollHalfPageUp()
-			command.ScrollHalfPageUp()
-		case "<C-f>":
-			pid.ScrollPageDown()
-			user.ScrollPageDown()
-			command.ScrollPageDown()
-		case "<C-b>":
-			pid.ScrollPageUp()
-			user.ScrollPageUp()
-			command.ScrollPageUp()
+		select {
+		case <-ticker:
+			update()
+		case e := <-uiEvents:
+			switch e.ID {
+			case "q", "<C-c>":
+				return
+			case "j", "<Down>":
+				pid.ScrollDown()
+				user.ScrollDown()
+				cpu.ScrollDown()
+				command.ScrollDown()
+			case "k", "<Up>":
+				pid.ScrollUp()
+				user.ScrollUp()
+				cpu.ScrollUp()
+				command.ScrollUp()
+			case "<C-d>":
+				pid.ScrollHalfPageDown()
+				user.ScrollHalfPageDown()
+				cpu.ScrollHalfPageDown()
+				command.ScrollHalfPageDown()
+			case "<C-u>":
+				pid.ScrollHalfPageUp()
+				user.ScrollHalfPageUp()
+				cpu.ScrollHalfPageUp()
+				command.ScrollHalfPageUp()
+			case "<C-f>":
+				pid.ScrollPageDown()
+				user.ScrollPageDown()
+				cpu.ScrollPageDown()
+				command.ScrollPageDown()
+			case "<C-b>":
+				pid.ScrollPageUp()
+				user.ScrollPageUp()
+				cpu.ScrollPageUp()
+				command.ScrollPageUp()
+			}
 		}
+
 		ui.Render(grid)
 	}
 
