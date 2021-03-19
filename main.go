@@ -209,29 +209,27 @@ func main() {
 		cpu.Rows = make([]string, 0)
 		command.Rows = make([]string, 0)
 		for _, p := range pids {
-			pid.Rows = append(pid.Rows, fmt.Sprintf("%d", p))
 			u, err := getUser(p)
 			if err != nil {
-				log.Fatalf("failed to get user: %v", err)
+				continue
 			}
-
-			user.Rows = append(user.Rows, u)
 			c, err := getCommand(p)
 			if err != nil {
-				log.Fatalf("failed to get command: %v", err)
+				continue
 			}
-			command.Rows = append(command.Rows, trim(c))
-
 			pstat, err := getProcStat(p)
 			if err != nil {
-				log.Fatalf("failed to get user: %v", err)
+				continue
 			}
 			per := 0.0
 			if ppstat, ok := ps[p]; ok && period > 0 {
 				per = float64(pstat.stime+pstat.utime-ppstat.stime-ppstat.utime) / float64(period) * 100
 			}
 			ps[p] = *pstat
+			pid.Rows = append(pid.Rows, fmt.Sprintf("%d", p))
+			user.Rows = append(user.Rows, u)
 			cpu.Rows = append(cpu.Rows, fmt.Sprintf("%f", per))
+			command.Rows = append(command.Rows, trim(c))
 		}
 		ui.Render(grid)
 		stat = nstat
